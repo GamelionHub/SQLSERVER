@@ -1,0 +1,42 @@
+-- Create a temporary table to store the results
+CREATE TABLE #UserDatabase (
+    DatabaseName VARCHAR(100),
+    UserName VARCHAR(100),
+    UserType VARCHAR(50)
+)
+
+-- Declare variables
+DECLARE @DBName VARCHAR(100)
+DECLARE @SQL NVARCHAR(MAX)
+
+-- Cursor to iterate through each database
+DECLARE DatabaseCursor CURSOR FOR
+SELECT name FROM sys.databases WHERE state = 0 -- state=0 means ONLINE
+
+OPEN DatabaseCursor
+FETCH NEXT FROM DatabaseCursor INTO @DBName
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    -- Build dynamic SQL to retrieve users for each database
+    SET @SQL = 'USE ' + QUOTENAME(@DBName) + ';
+                INSERT INTO #UserDatabase (DatabaseName, UserName, UserType)
+                SELECT DB_NAME() AS DatabaseName, name AS UserName, type_desc AS UserType
+                FROM sys.database_principals
+                WHERE type IN (''S'', ''U'', ''G'')'
+
+    EXEC sp_executesql @SQL
+
+    FETCH NEXT FROM DatabaseCursor INTO @DBName
+END
+
+CLOSE DatabaseCursor
+DEALLOCATE DatabaseCursor
+
+-- Retrieve the merged results from the temporary table
+SELECT DatabaseName, UserName, UserType
+FROM #UserDatabase
+ORDER BY DatabaseName, UserName
+
+-- Clean up the temporary table
+DROP TABLE #UserDatabase
