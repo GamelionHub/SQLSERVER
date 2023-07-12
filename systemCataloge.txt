@@ -1,0 +1,33 @@
+list the users of all databases in SQL Server, you can query the system catalog views. Here's an example query that retrieves the users for each database:
+
+```sql
+DECLARE @DBName VARCHAR(100)
+DECLARE @SQL NVARCHAR(MAX)
+
+DECLARE DatabaseCursor CURSOR FOR
+SELECT name FROM sys.databases WHERE state = 0 -- state=0 means ONLINE
+
+OPEN DatabaseCursor
+FETCH NEXT FROM DatabaseCursor INTO @DBName
+
+WHILE @@FETCH_STATUS = 0
+BEGIN
+    SET @SQL = 'USE ' + QUOTENAME(@DBName) + ';
+                SELECT DB_NAME() AS DatabaseName, name AS UserName, type_desc AS UserType
+                FROM sys.database_principals
+                WHERE type IN (''S'', ''U'', ''G'')'
+
+    EXEC sp_executesql @SQL
+
+    FETCH NEXT FROM DatabaseCursor INTO @DBName
+END
+
+CLOSE DatabaseCursor
+DEALLOCATE DatabaseCursor
+```
+
+This script uses a cursor to iterate through each database (`sys.databases`), excluding any databases that are not online. For each database, it sets the database context (`USE <DatabaseName>`) and then queries the `sys.database_principals` view to retrieve the users (`type IN ('S', 'U', 'G')`).
+
+The result of this query will include the database name, user name, and user type. The user type can be 'S' (SQL Server user), 'U' (Windows user), or 'G' (Windows group).
+
+Note that you need appropriate permissions to execute this query, as it accesses system catalog views.
